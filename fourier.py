@@ -11,23 +11,35 @@ def get_conjugate_spectrum(I):
     Ic = fftshift(fft2(I))
     return Ic
 
-def convolved_conjugate_spectrum(Ic,xmin,xmax,ymin,ymax,x1,x2,y1,y2,doppler,delay):
+def convolved_conjugate_spectrum(Ic,doppler,delay,f0):
+
+    delay_max = 7*16384/10 #+ 1177
+    delay_min = 16384/2 #+ 692
+    doppler_min = 0 #int(660/2 - 206*(f0/314.5))
+    doppler_max = 660/2 #int(660/2 - 41*(f0/314.5))
+   
+    delay1 = 0.148
+    doppler1 = -20.52*(f0/338.5)
+    #doppler1 = (-20.35-doppler_resolution*1.0)*f0/338.5
+    delay2 = 0.135
+    doppler2 = doppler1
+
     I = ifft2(ifftshift(Ic))
 
-    yi = np.argmin(abs(delay-np.average([y1,y2])))
-    xi = np.argmin(abs(doppler-np.average([x1,x2])))
+    delayi = np.argmin(abs(delay-np.average([delay1,delay2])))
+    doppleri = np.argmin(abs(doppler-np.average([doppler1,doppler2])))
 
     mask = np.zeros(Ic.shape)
-    mask[xmin:xmax,ymin:ymax]=1.0
-    for i in range(ymin,ymax):
-        yu=parabola(doppler[i],x1,y1)
-        yl=parabola(doppler[i],x2,y2)
-        mask[:,i] = np.where(delay>yu, 0, mask[:,i])
-        mask[:,i] = np.where(delay<yl, 0, mask[:,i])
+    mask[delay_min:delay_max,doppler_min:doppler_max]=1.0
+    for i in range(doppler_min,doppler_max):
+        delayu=parabola(doppler[i],doppler1,delay1)
+        delayl=parabola(doppler[i],doppler2,delay2)
+        mask[:,i] = np.where(delay>delayu, 0, mask[:,i])
+        mask[:,i] = np.where(delay<delayl, 0, mask[:,i])
     Iarc = ifft2(ifftshift(Ic*mask))
     I2 = np.real(I)*np.exp(-1.0j*np.angle(Iarc))
     I2c = fftshift(fft2(I2))
-    I2c = np.roll(np.roll(I2c,xi-len(doppler)/2,1),yi-len(delay)/2,0)
+    I2c = np.roll(np.roll(I2c,doppleri-len(doppler)/2,1),delayi-len(delay)/2,0)
     return I2c
 
 def fourier_transform_incremental_width(I,frequency,f0):
@@ -50,3 +62,16 @@ def slow_dft(x,scaling):
     k = np.where(k<0,k+len(k),k)
     M = np.exp(-2j*np.pi*k*n/N)
     return np.dot(M,x)
+
+def read_data(dir,num_columns,num_rows,filer,filei):
+    datar = np.fromfile(dir+filer,
+                        dtype=np.float32).reshape(num_columns,num_rows).T
+    datai = np.fromfile(dir+filei, 
+                        dtype=np.float32).reshape(num_columns,num_rows).T
+    
+    I = datar + 1.0j*datai
+    
+    del datar
+    del datai
+
+    return I

@@ -1,5 +1,10 @@
 import numpy as np
-from scipy.fftpack import fftshift, fft2, ifft2, ifftshift, fft, ifft
+import matplotlib.pyplot as plt
+import matplotlib
+font = {'family' : 'normal',
+        'weight' : 'normal',
+        'size'   : 14}
+matplotlib.rc('font', **font)
 
 def __init__():
     return
@@ -13,7 +18,7 @@ def smooth( array, n0, n1 ):
     array_out = array_out * (1. + 2.*n0 + 2.*n1 )
     return array_out
 
-def plot_secondary(I1,I2,doppler,delay):
+def plot_secondary(I1,I2,doppler,delay,num_rows):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     plt.imshow(np.log(np.real(smooth(I1*np.conjugate(I2),5,0))
