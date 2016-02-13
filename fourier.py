@@ -7,6 +7,9 @@ def __init__():
 def parabola(x,x0,y0):
     return -y0/x0**2.0*(x-x0)**2.0 + y0
 
+def main_parabola_x(y,x1,y1):
+    return np.sqrt(x1**2./y1*y)
+
 def get_conjugate_spectrum(I):
     Ic = fftshift(fft2(I))
     return Ic
@@ -21,7 +24,7 @@ def convolved_conjugate_spectrum(Ic,doppler,delay,f0):
     delay1 = 0.148
     doppler1 = -20.52*(f0/338.5)
     #doppler1 = (-20.35-doppler_resolution*1.0)*f0/338.5
-    delay2 = 0.135
+    delay2 = 0.138
     doppler2 = doppler1
 
     I = ifft2(ifftshift(Ic))
@@ -42,6 +45,69 @@ def convolved_conjugate_spectrum(Ic,doppler,delay,f0):
     I2c = np.roll(np.roll(I2c,doppleri-len(doppler)/2,1),delayi-len(delay)/2,0)
     return I2c
 
+def convolved_conjugate_spectrum_small(Ic,doppler,delay,f0):
+
+    delay_max = 7*16384/10 #+ 1177
+    delay_min = 16384/2 +559 #cut of at a delay of 0.07 ms
+    doppler_min = 0 #int(660/2 - 206*(f0/314.5))
+    doppler_max = 660/2 #int(660/2 - 41*(f0/314.5))
+   
+    delay1 = 0.148
+    doppler1 = -20.52*(f0/338.5)
+    #doppler1 = (-20.35-doppler_resolution*1.0)*f0/338.5
+    delay2 = 0.138
+    doppler2 = doppler1
+
+    I = ifft2(ifftshift(Ic))
+
+    delayi = np.argmin(abs(delay-np.average([delay1,delay2])))
+    doppleri = np.argmin(abs(doppler-np.average([doppler1,doppler2])))
+
+    mask = np.zeros(Ic.shape)
+    mask[delay_min:delay_max,doppler_min:doppler_max]=1.0
+    for i in range(doppler_min,doppler_max):
+        delayu=parabola(doppler[i],doppler1,delay1)
+        delayl=parabola(doppler[i],doppler2,delay2)
+        mask[:,i] = np.where(delay>delayu, 0, mask[:,i])
+        mask[:,i] = np.where(delay<delayl, 0, mask[:,i])
+    Iarc = ifft2(ifftshift(Ic*mask))
+    I2 = np.real(I)*np.exp(-1.0j*np.angle(Iarc))
+    I2c = fftshift(fft2(I2))
+    I2c = np.roll(np.roll(I2c,doppleri-len(doppler)/2,1),delayi-len(delay)/2,0)
+    return I2c
+
+def convolved_conjugate_spectrum_small_dividedbands(Ic,doppler,delay,f0,nsubbands):
+
+    delay_max = 7*16384/10/nsubbands #+ 1177
+    delay_min = 16384/2/nsubbands +559/nsubbands #cut of at a delay of 0.07 ms
+    doppler_min = 0 #int(660/2 - 206*(f0/314.5))
+    doppler_max = 660/2 #int(660/2 - 41*(f0/314.5))
+   
+    delay1 = 0.148
+    doppler1 = -20.52*(f0/338.5)
+    #doppler1 = (-20.35-doppler_resolution*1.0)*f0/338.5
+    delay2 = 0.138
+    doppler2 = doppler1
+
+    I = ifft2(ifftshift(Ic))
+
+    delayi = np.argmin(abs(delay-np.average([delay1,delay2])))
+    doppleri = np.argmin(abs(doppler-np.average([doppler1,doppler2])))
+
+    mask = np.zeros(Ic.shape)
+    mask[delay_min:delay_max,doppler_min:doppler_max]=1.0
+    for i in range(doppler_min,doppler_max):
+        delayu=parabola(doppler[i],doppler1,delay1)
+        delayl=parabola(doppler[i],doppler2,delay2)
+        mask[:,i] = np.where(delay>delayu, 0, mask[:,i])
+        mask[:,i] = np.where(delay<delayl, 0, mask[:,i])
+    Iarc = ifft2(ifftshift(Ic*mask))
+    I2 = np.real(I)*np.exp(-1.0j*np.angle(Iarc))
+    I2c = fftshift(fft2(I2))
+    I2c = np.roll(np.roll(I2c,doppleri-len(doppler)/2,1),delayi-len(delay)/2,0)
+    return I2c
+
+
 def fourier_transform_incremental_width(I,frequency,f0):
     If = np.ones(I.shape)*(1.0 + 1.0j)
     next = 0.0
@@ -58,8 +124,9 @@ def slow_dft(x,scaling):
     N = x.shape[0]
     n = np.arange(N)
     k = n.reshape((N,1))
-    k = np.where(k>len(k)/2,k-len(k),k)*scaling
-    k = np.where(k<0,k+len(k),k)
+    Pk = N #np.max(k)-np.min(k)
+    k = np.where(k>=Pk/2,k-Pk,k)*scaling
+    k = np.where(k<0,k+Pk,k)
     M = np.exp(-2j*np.pi*k*n/N)
     return np.dot(M,x)
 
